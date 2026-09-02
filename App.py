@@ -9,36 +9,27 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. MOTOR DE ESTILOS 3D, SOMBRAS Y ANIMACIONES (CSS Avanzado)
+# 2. ESTILOS 3D, SOMBRAS Y ANIMACIONES
 st.markdown("""
 <style>
-    /* Fondo OLED Ultra Oscuro */
     .stApp {
         background-color: #060709;
         color: #f3f4f6;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
     
-    /* Contenedor tipo móvil */
     .block-container {
         padding-top: 1.5rem;
         padding-bottom: 3rem;
         max-width: 480px;
     }
 
-    /* Animaciones */
     @keyframes pulseGlow {
         0% { transform: scale(1); box-shadow: 0 0 25px rgba(50, 215, 75, 0.2); }
         50% { transform: scale(1.02); box-shadow: 0 0 45px rgba(50, 215, 75, 0.45); }
         100% { transform: scale(1); box-shadow: 0 0 25px rgba(50, 215, 75, 0.2); }
     }
 
-    @keyframes floatOrb {
-        0%, 100% { transform: translateY(0px) rotate(0deg); }
-        50% { transform: translateY(-6px) rotate(180deg); }
-    }
-
-    /* Tarjetas con profundidad 3D y bordes biselados */
     .card-3d {
         background: linear-gradient(145deg, #16181d, #0d0e12);
         border: 1px solid rgba(255, 255, 255, 0.07);
@@ -46,10 +37,8 @@ st.markdown("""
         padding: 16px;
         box-shadow: 0 12px 28px rgba(0, 0, 0, 0.7), inset 0 1px 1px rgba(255, 255, 255, 0.1);
         margin-bottom: 14px;
-        transition: transform 0.2s ease;
     }
 
-    /* Orbe 3D Healthspan animado */
     .bio-orb-container {
         background: radial-gradient(circle at center, #072517 0%, #0d1210 65%, #07090a 100%);
         border: 1px solid rgba(50, 215, 75, 0.3);
@@ -58,8 +47,6 @@ st.markdown("""
         text-align: center;
         margin-bottom: 18px;
         animation: pulseGlow 4s infinite ease-in-out;
-        position: relative;
-        overflow: hidden;
     }
 
     .bio-orb-sphere {
@@ -91,7 +78,6 @@ st.markdown("""
         margin-top: 4px;
     }
 
-    /* Mini métricas duales (Pasos / Calorías) */
     .metric-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -122,7 +108,6 @@ st.markdown("""
         margin-top: 4px;
     }
 
-    /* Estado vacío para actividades */
     .empty-state {
         border: 1px dashed rgba(255, 255, 255, 0.15);
         border-radius: 16px;
@@ -145,31 +130,24 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 3. REPOSITORIO DE DATOS (EN CEROS POR DEFECTO HASTA CONECTAR LA API)
+# 3. ESTADO INICIAL EN CEROS
 def fetch_wearable_data():
-    """
-    Retorna el estado inicial en ceros absolutos.
-    Una vez conectada la API de Google Fit / SQLite, sustituye estas variables
-    con la lectura directa de tu Mi Band.
-    """
     return {
-        "is_connected": False, # Bandera de estado
-        "sleep_score": 0,      # Rango 0 - 100
-        "recovery_score": 0,   # Rango 0 - 100%
-        "strain_score": 0.0,   # Rango 0.0 - 21.0
-        "bio_age": 0.0,        # 0.0 indica pendiente de cálculo
-        "steps": 0,            # Pasos del día
-        "calories": 0,         # Calorías quemadas activas + basales
-        "rhr": 0,              # Resting Heart Rate
-        "activities": []       # Lista vacía hasta registrar entrenamientos
+        "is_connected": False,
+        "sleep_score": 0,
+        "recovery_score": 0,
+        "strain_score": 0.0,
+        "bio_age": 0.0,
+        "steps": 0,
+        "calories": 0,
+        "rhr": 0,
+        "activities": []
     }
 
-# 4. GENERADOR DE ANILLOS ESTILO WHOOP 3D
-def render_metric_ring(value, max_val, color_hex, ring_title, suffix=""):
-    # Si el valor es cero, se muestra un arco neutro tenue
+# 4. GENERADOR DE ANILLOS
+def render_metric_ring(value, max_val, color_hex, suffix=""):
     bar_color = color_hex if value > 0 else "rgba(255,255,255,0.08)"
-    display_val = f"{value}{suffix}" if value > 0 else "--"
-
+    
     fig = go.Figure(go.Indicator(
         mode="gauge+number",
         value=value,
@@ -199,7 +177,6 @@ def render_metric_ring(value, max_val, color_hex, ring_title, suffix=""):
 def main():
     data = fetch_wearable_data()
 
-    # Barra superior con estado del hardware
     status_color = "#32d74b" if data["is_connected"] else "#ff453a"
     status_text = "SYNCED" if data["is_connected"] else "OFFLINE • ESPERANDO DATOS"
     
@@ -213,26 +190,37 @@ def main():
         </div>
     """, unsafe_allow_html=True)
 
-    # 3 ANILLOS PRINCIPALES (SUEÑO, RECUPERACIÓN, ESFUERZO)
+    # 3 ANILLOS (Se agregan keys explícitas para eliminar el StreamlitDuplicateElementId)
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        st.plotly_chart(render_metric_ring(data["sleep_score"], 100, "#60a5fa", "SLEEP", "%"), use_container_width=True)
+        st.plotly_chart(
+            render_metric_ring(data["sleep_score"], 100, "#60a5fa", "%"),
+            use_container_width=True,
+            key="ring_sleep"
+        )
         st.markdown("<div style='text-align: center; font-size: 11px; font-weight: 700; color: #60a5fa; letter-spacing: 1px; margin-top: -15px;'>SUEÑO</div>", unsafe_allow_html=True)
 
     with col2:
-        # Dinámica de color: Verde > 66%, Amarillo > 33%, Rojo <= 33%
         rec_color = "#34d399" if data["recovery_score"] >= 66 else ("#fbbf24" if data["recovery_score"] >= 33 else "#f87171")
-        st.plotly_chart(render_metric_ring(data["recovery_score"], 100, rec_color, "RECOVERY", "%"), use_container_width=True)
+        st.plotly_chart(
+            render_metric_ring(data["recovery_score"], 100, rec_color, "%"),
+            use_container_width=True,
+            key="ring_recovery"
+        )
         st.markdown(f"<div style='text-align: center; font-size: 11px; font-weight: 700; color: {rec_color}; letter-spacing: 1px; margin-top: -15px;'>RECUPERACIÓN</div>", unsafe_allow_html=True)
 
     with col3:
-        st.plotly_chart(render_metric_ring(data["strain_score"], 21, "#38bdf8", "STRAIN", ""), use_container_width=True)
+        st.plotly_chart(
+            render_metric_ring(data["strain_score"], 21, "#38bdf8", ""),
+            use_container_width=True,
+            key="ring_strain"
+        )
         st.markdown("<div style='text-align: center; font-size: 11px; font-weight: 700; color: #38bdf8; letter-spacing: 1px; margin-top: -15px;'>ESFUERZO</div>", unsafe_allow_html=True)
 
     st.markdown("<div style='margin-top: 25px;'></div>", unsafe_allow_html=True)
 
-    # ORBE 3D DE EDAD BIOLÓGICA (HEALTHSPAN)
+    # ORBE 3D DE EDAD BIOLÓGICA
     bio_age_str = f"{data['bio_age']:.1f}" if data["bio_age"] > 0 else "--"
     sub_text = "Esperando sincronización de VO2 Max y RHR" if data["bio_age"] == 0 else "Optimización Cardiovascular Activa"
 
@@ -247,27 +235,30 @@ def main():
         </div>
     """, unsafe_allow_html=True)
 
-    # TARJETAS DUALES: PASOS Y CALORÍAS
+    # PASOS Y CALORÍAS
+    step_pct = min(100, (data["steps"] / 10000) * 100) if data["steps"] > 0 else 0
+    cal_pct = min(100, (data["calories"] / 2500) * 100) if data["calories"] > 0 else 0
+
     st.markdown(f"""
         <div class='metric-grid'>
             <div class='mini-metric-card'>
                 <div class='mini-title'>👟 Pasos</div>
                 <div class='mini-val'>{data['steps']:,}</div>
                 <div style='height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; margin-top: 8px; overflow: hidden;'>
-                    <div style='height: 100%; width: {min(100, (data["steps"]/10000)*100)}%; background: #3b82f6;'></div>
+                    <div style='height: 100%; width: {step_pct}%; background: #3b82f6;'></div>
                 </div>
             </div>
             <div class='mini-metric-card'>
                 <div class='mini-title'>🔥 Calorías</div>
                 <div class='mini-val'>{data['calories']:,} <span style='font-size: 14px; font-weight: 400; color: #71717a;'>kcal</span></div>
                 <div style='height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; margin-top: 8px; overflow: hidden;'>
-                    <div style='height: 100%; width: {min(100, (data["calories"]/2500)*100)}%; background: #f97316;'></div>
+                    <div style='height: 100%; width: {cal_pct}%; background: #f97316;'></div>
                 </div>
             </div>
         </div>
     """, unsafe_allow_html=True)
 
-    # ÚLTIMAS ACTIVIDADES FÍSICAS
+    # ACTIVIDADES
     st.markdown("<div style='font-size: 14px; font-weight: 700; letter-spacing: 1px; margin-bottom: 12px;'>ACTIVIDADES REGISTRADAS</div>", unsafe_allow_html=True)
 
     if not data["activities"]:
